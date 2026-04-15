@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="preload" href="./images/hero-01.webp" as="image" type="image/webp">
 <style>
 /* ============================================
    RESET & BASE
@@ -1056,7 +1057,7 @@ ul { list-style: none; }
 
   <!-- Slide 2 -->
   <div class="hero-slide slide-2" data-slide="1">
-    <div class="hero-bg" style="background-image:url('./images/hero-02.webp');" data-placeholder="hero-02.webp"></div>
+    <div class="hero-bg" data-bg="./images/hero-02.webp" data-placeholder="hero-02.webp"></div>
     <div class="hero-overlay"></div>
     <div class="hero-content">
       <div class="hero-label">Our Mission</div>
@@ -1067,7 +1068,7 @@ ul { list-style: none; }
 
   <!-- Slide 3 -->
   <div class="hero-slide slide-3" data-slide="2">
-    <div class="hero-bg" style="background-image:url('./images/hero-03.webp');" data-placeholder="hero-03.webp"></div>
+    <div class="hero-bg" data-bg="./images/hero-03.webp" data-placeholder="hero-03.webp"></div>
     <div class="hero-overlay"></div>
     <div class="hero-content">
       <div class="hero-headline">Join Our Team</div>
@@ -1278,7 +1279,7 @@ ul { list-style: none; }
 <!-- ============================================
      RECRUIT SECTION
      ============================================ -->
-<section class="section recruit" id="recruit" style="background-image:url('./images/deco-03.webp');">
+<section class="section recruit" id="recruit" data-bg="./images/deco-03.webp">
   <div class="recruit-overlay"></div>
   <div class="recruit-inner">
     <div class="recruit-text">
@@ -1347,7 +1348,7 @@ ul { list-style: none; }
 <!-- ============================================
      FOOTER
      ============================================ -->
-<footer class="footer" style="background-image:url('./images/deco-04.webp');">
+<footer class="footer" data-bg="./images/deco-04.webp">
   <div class="footer-overlay"></div>
   <div class="footer-inner">
     <div class="footer-brand">
@@ -1435,6 +1436,7 @@ ul { list-style: none; }
     currentSlide = index;
     slides[currentSlide].classList.add('active');
     indicators[currentSlide].classList.add('active');
+    lazyLoadHeroSlides();
   }
 
   function nextSlide(){
@@ -1501,51 +1503,54 @@ ul { list-style: none; }
   var tableEl = document.querySelector('.comparison-table');
   if(tableEl) countObserver.observe(tableEl);
 
-  /* ---- Image Placeholder Fallback ---- */
-  document.querySelectorAll('[data-src]').forEach(function(el){
-    if(el.tagName === 'IMG') return;
-    var src = el.dataset.src;
-    if(!el.querySelector('img') || el.classList.contains('img-placeholder')){
-      el.setAttribute('data-src', src);
-    }
-  });
-
-  /* ---- Hero Background Placeholder ---- */
-  document.querySelectorAll('.hero-bg').forEach(function(bg){
-    var testImg = new Image();
-    var placeholder = bg.dataset.placeholder;
-    testImg.onerror = function(){
-      bg.style.backgroundImage = 'none';
-      bg.style.display = 'flex';
-      bg.style.alignItems = 'center';
-      bg.style.justifyContent = 'center';
-      bg.style.color = '#94a3b8';
-      bg.style.fontFamily = 'monospace';
-      bg.style.fontSize = '0.8rem';
-      bg.innerHTML = placeholder;
+  /* ---- Lazy Background Image Loader ---- */
+  function loadBgImage(el){
+    var src = el.dataset.bg;
+    if(!src || el.dataset.bgLoaded) return;
+    el.dataset.bgLoaded = '1';
+    var img = new Image();
+    img.onload = function(){ el.style.backgroundImage = 'url(' + src + ')'; };
+    img.onerror = function(){
+      var placeholder = el.dataset.placeholder;
+      if(placeholder){
+        el.style.display = 'flex';
+        el.style.alignItems = 'center';
+        el.style.justifyContent = 'center';
+        el.style.color = '#94a3b8';
+        el.style.fontFamily = 'monospace';
+        el.style.fontSize = '0.8rem';
+        el.innerHTML = placeholder;
+      }
     };
-    testImg.src = bg.style.backgroundImage.replace(/url\(['"]?/, '').replace(/['"]?\)/, '');
-  });
-
-  /* ---- Recruit Background Placeholder ---- */
-  var recruitSection = document.getElementById('recruit');
-  if(recruitSection){
-    var rTestImg = new Image();
-    rTestImg.onerror = function(){
-      recruitSection.style.backgroundImage = 'none';
-    };
-    rTestImg.src = './images/deco-03.webp';
+    img.src = src;
   }
 
-  /* ---- Footer Background Placeholder ---- */
-  var footerEl = document.querySelector('.footer');
-  if(footerEl){
-    var fTestImg = new Image();
-    fTestImg.onerror = function(){
-      footerEl.style.backgroundImage = 'none';
-    };
-    fTestImg.src = './images/deco-04.webp';
+  /* Load hero slide 1 background immediately (already preloaded) */
+  var firstBg = document.querySelector('.slide-1 .hero-bg');
+  if(firstBg){
+    firstBg.style.backgroundImage = "url('./images/hero-01.webp')";
   }
+
+  /* Lazy load: hero slide 2/3 backgrounds on first carousel transition */
+  var heroLazyLoaded = false;
+  function lazyLoadHeroSlides(){
+    if(heroLazyLoaded) return;
+    heroLazyLoaded = true;
+    document.querySelectorAll('.hero-bg[data-bg]').forEach(loadBgImage);
+  }
+
+  /* Lazy load: recruit/footer backgrounds via IntersectionObserver */
+  var bgLazyObserver = new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){
+      if(entry.isIntersecting){
+        loadBgImage(entry.target);
+        bgLazyObserver.unobserve(entry.target);
+      }
+    });
+  }, {rootMargin: '200px 0px'});
+  document.querySelectorAll('[data-bg]:not(.hero-bg)').forEach(function(el){
+    bgLazyObserver.observe(el);
+  });
 
   /* ---- Smooth scroll for anchor links (offset for fixed header) ---- */
   document.querySelectorAll('a[href^="#"]').forEach(function(anchor){
